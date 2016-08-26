@@ -36,15 +36,15 @@ def strip_archive_extensions(path, extensions=["tar", "tgz", "bz2", "gz"]):
         return path
 
 
-def get_remote_file(url, output_dir=None, file_name=None, force=False,  
+def get_remote_file(url, output_dir=None, file_name=None, force=False,
                          verbose=False, ask_user=False, unpack=True):
     r"""Fetch file located at *url* and store at *output_dir*.
 
     :Input:
-    
+
      - *url* (path) - URL to file to be downloaded.
      - *output_dir* (path) - Directory that the remote file will be downloaded
-       to.  Defaults to the GeoClaw sratch directory defined by 
+       to.  Defaults to the GeoClaw sratch directory defined by
        *os.path.join(os.environ['CLAW'], 'geoclaw', 'scratch')*.
      - *file_name* (string) - Name of local file.  This defaults to the name of
        the remote file.
@@ -55,7 +55,7 @@ def get_remote_file(url, output_dir=None, file_name=None, force=False,
        file before proceeding.  Default is *False*
 
     :Raises:
-     
+
     Exceptions are raised from the *urllib2* module having to do with errors
     fetching the remote file.  Please see its documentation for more details of
     the exceptions that can be raised.
@@ -68,7 +68,7 @@ def get_remote_file(url, output_dir=None, file_name=None, force=False,
 
     if file_name is None:
         file_name = os.path.basename(url)
-        
+
     output_path = os.path.join(output_dir, file_name)
     unarchived_output_path = strip_archive_extensions(output_path)
 
@@ -82,7 +82,7 @@ def get_remote_file(url, output_dir=None, file_name=None, force=False,
                 if verbose:
                     print "*** Aborting download."
                 return None
-            
+
         if not os.path.exists(output_path):
             # Fetch remote file, will raise a variety of exceptions depending on
             # the retrieval problem if it happens
@@ -98,7 +98,7 @@ def get_remote_file(url, output_dir=None, file_name=None, force=False,
 
         if tarfile.is_tarfile(output_path) and unpack:
             if verbose:
-                print "Un-archiving %s to %s..." % (output_path, 
+                print "Un-archiving %s to %s..." % (output_path,
                                                     unarchived_output_path)
             with tarfile.open(output_path, mode="r:*") as tar_file:
                 tar_file.extractall(path=output_dir)
@@ -129,14 +129,14 @@ class ClawData(object):
     but new attributes can only be added using the method add_attribute.
 
     Trying to set a nonexistent attribute will raise an AttributeError
-    exception, except for those starting with '_'.   
+    exception, except for those starting with '_'.
     """
 
 
     def __init__(self, attributes=None):
-        
-        # Attribute to store a list of the allowed attributes, 
-        # appended to when add_attribute is used: 
+
+        # Attribute to store a list of the allowed attributes,
+        # appended to when add_attribute is used:
         object.__setattr__(self,'_attributes',[])
 
         # Output file handle
@@ -160,7 +160,7 @@ class ClawData(object):
             print "*** Perhaps a typo?"
             print "*** Add new attributes using add_attribute method"
             raise AttributeError("Unrecognized attribute: %s" % name)
-        
+
         # attribute exists, ok to set:
         object.__setattr__(self,name,value)
 
@@ -228,7 +228,7 @@ class ClawData(object):
         """
         return name in self._attributes
 
-        
+
     def iteritems(self):
         r"""
         Returns an iterator of attributes and values from this object
@@ -324,12 +324,12 @@ class ClawData(object):
             padded_value = string.ljust(string_value, 20)
             padded_name = string.ljust(alt_name,20)
             if description != '':
-                self._out_file.write('%s =: %s # %s \n' % 
+                self._out_file.write('%s =: %s # %s \n' %
                                         (padded_value, padded_name, description))
             else:
-                self._out_file.write('%s =: %s\n' % 
+                self._out_file.write('%s =: %s\n' %
                                     (padded_value, padded_name))
-  
+
 
     def read(self,path,force=False):
         r"""Read and fill applicable data attributes.
@@ -355,7 +355,7 @@ class ClawData(object):
                     self.add_attribute(varname,value)
                 else:
                     setattr(self,varname,value)
-    
+
 
     def _parse_value(self,value):
         r"""
@@ -430,6 +430,7 @@ class ClawRunData(ClawData):
             self.add_data(amrclaw.AmrclawInputData(self.clawdata),'amrdata')
             self.add_data(amrclaw.RegionData(num_dim=num_dim),'regiondata')
             self.add_data(amrclaw.GaugeData(num_dim=num_dim),'gaugedata')
+            self.add_data(SliceData(),'slicedata')
 
         elif pkg.lower() in ['geoclaw']:
 
@@ -489,6 +490,66 @@ class ClawRunData(ClawData):
             data_object.write()
 
 
+class SliceData(ClawData):
+    r"""
+    Object containing 3d slice data, usually written to 'slices.data'.
+
+
+    """
+
+    def __init__(self):
+        super(SliceData,self).__init__()
+
+        self.add_attribute('slices',[])
+
+    def add(self,normal,point):
+        new_slice = ClawSlice(normal,point)
+        self.slices.append(new_slice)
+
+    def write(self,out_file='slices.data',data_source='setrun.py'):
+        r"""Write out slice information data file."""
+
+        # Write out slice data file
+        self.open_data_file(out_file,data_source)
+        self.data_write(name='nslices', value=len(self.slices))
+        for current_slice in self.slices:
+            self.data_write(name='normal',value=current_slice.normal)
+            self.data_write(name='point',value=current_slice.point)
+        self.close_data_file()
+
+    def read(Self,data_path="./",filename='slices.data'):
+        r"""Read slice data file"""
+        path = os.path.join(data_path, file_name)
+        slice_file = open(path,'r')
+
+        # Read past comments and blank lines
+        header_lines = 0
+        ignore_lines = True
+        while ignore_lines:
+            line = slice_file.readline()
+            if line[0] == "#" or len(line.strip()) == 0:
+                header_lines += 1
+            else:
+                break
+
+        # Read number of slices
+        num_slices = int(line.split()[0])
+
+        # Read slices
+        for n in xrange(num_slices):
+            line = slice_file.readline().split()
+            normal = [float(a) for a in line[0:3]]
+            point = [float(a) for a in line[3:6]]
+            self.add(normal,point)
+
+        slice_file.close()
+
+class ClawSlice():
+    r"""Slice object"""
+
+    def __init__(self,normal,point):
+        self.normal = normal
+        self.point = point
 
 class ClawInputData(ClawData):
     r"""
@@ -516,7 +577,7 @@ class ClawInputData(ClawData):
         self.add_attribute('output_q_components','all')
         self.add_attribute('output_aux_components','none')
         self.add_attribute('output_aux_onlyonce',True)
-        
+
         self.add_attribute('dt_initial',1.e-5)
         self.add_attribute('dt_max',1.e99)
         self.add_attribute('dt_variable',True)
@@ -533,7 +594,7 @@ class ClawInputData(ClawData):
         self.add_attribute('t0',0.)
         self.add_attribute('num_ghost',2)
         self.add_attribute('use_fwaves',False)
-        
+
         if num_dim == 1:
             self.add_attribute('lower',[0.])
             self.add_attribute('upper',[1.])
@@ -614,7 +675,7 @@ class ClawInputData(ClawData):
         else:
             raise ValueError("*** Error in data parameter: " + \
                   "output_format unrecognized: ",self.output_format)
-            
+
         self.data_write('output_format')
 
         if self.output_q_components == 'all':
@@ -626,7 +687,7 @@ class ClawInputData(ClawData):
             print "*** WARNING: Selective output_q_components not implemented"
             print "***          Will output all components of q"
             iout_q = self.num_eqn * [1]
-    
+
 
         # Write out local value of iout_q rather than a data member
         self.data_write('', value=iout_q, alt_name='iout_q')
@@ -663,32 +724,32 @@ class ClawInputData(ClawData):
         else:
             # Transverse options different in 2D and 3D
             if self.num_dim == 2:
-                if self.transverse_waves in [0,'none']:  
+                if self.transverse_waves in [0,'none']:
                     self.transverse_waves = 0
-                elif self.transverse_waves in [1,'increment']:  
+                elif self.transverse_waves in [1,'increment']:
                     self.transverse_waves = 1
-                elif self.transverse_waves in [2,'all']:  
+                elif self.transverse_waves in [2,'all']:
                     self.transverse_waves = 2
                 else:
                     raise AttributeError("Unrecognized transverse_waves: %s" \
                                              % self.transverse_waves)
             else:    # 3D
-                if self.transverse_waves in [0,'none']:  
+                if self.transverse_waves in [0,'none']:
                     self.transverse_waves = 0
-                elif self.transverse_waves in [1,'increment']:  
+                elif self.transverse_waves in [1,'increment']:
                     self.transverse_waves = 11
-                elif self.transverse_waves in [2,'all']:  
+                elif self.transverse_waves in [2,'all']:
                     self.transverse_waves = 22
                 if not (self.transverse_waves in [0, 10, 11, 20, 21, 22]):
                     raise AttributeError("Unrecognized transverse_waves: %s" \
                                              % self.transverse_waves)
             self.data_write(file, self.transverse_waves, 'transverse_waves')
 
-            if self.dimensional_split in [0,'unsplit']:  
+            if self.dimensional_split in [0,'unsplit']:
                 self.dimensional_split = 0
-            elif self.dimensional_split in [1,'godunov']:  
+            elif self.dimensional_split in [1,'godunov']:
                 self.dimensional_split = 1
-            elif self.dimensional_split in [2,'strang']:  
+            elif self.dimensional_split in [2,'strang']:
                 if self.num_dim == 3:
                     raise AttributeError("Strang dimensional splitting not supported in 3D")
                 else:
@@ -697,14 +758,14 @@ class ClawInputData(ClawData):
                 raise AttributeError("Unrecognized dimensional_split: %s" \
                       % self.dimensional_split)
             self.data_write('dimensional_split')
-            
+
         self.data_write('verbosity')
 
-        if self.source_split in [0,'none']:  
+        if self.source_split in [0,'none']:
             self.source_split = 0
-        elif self.source_split in [1,'godunov']:  
+        elif self.source_split in [1,'godunov']:
             self.source_split = 1
-        elif self.source_split in [2,'strang']:  
+        elif self.source_split in [2,'strang']:
             self.source_split = 2
         else:
             raise AttributeError("Unrecognized source_split: %s" \
