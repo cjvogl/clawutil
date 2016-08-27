@@ -502,8 +502,8 @@ class SliceData(ClawData):
 
         self.add_attribute('slices',[])
 
-    def add(self,normal,point):
-        new_slice = ClawSlice(normal,point)
+    def add(self,point,normal):
+        new_slice = ClawSlice(point,normal)
         self.slices.append(new_slice)
 
     def write(self,out_file='slices.data',data_source='setrun.py'):
@@ -513,8 +513,8 @@ class SliceData(ClawData):
         self.open_data_file(out_file,data_source)
         self.data_write(name='nslices', value=len(self.slices))
         for current_slice in self.slices:
-            self.data_write(name='normal',value=current_slice.normal)
             self.data_write(name='point',value=current_slice.point)
+            self.data_write(name='normal',value=current_slice.normal)
         self.close_data_file()
 
     def read(Self,data_path="./",filename='slices.data'):
@@ -538,18 +538,18 @@ class SliceData(ClawData):
         # Read slices
         for n in xrange(num_slices):
             line = slice_file.readline().split()
-            normal = [float(a) for a in line[0:3]]
             point = [float(a) for a in line[3:6]]
-            self.add(normal,point)
+            normal = [float(a) for a in line[0:3]]
+            self.add(point,normal)
 
         slice_file.close()
 
 class ClawSlice():
-    r"""Slice object"""
+    r"""An output plane defined by a point and normal direction"""
 
-    def __init__(self,normal,point):
-        self.normal = normal
+    def __init__(self,point,normal):
         self.point = point
+        self.normal = normal
 
 class ClawInputData(ClawData):
     r"""
